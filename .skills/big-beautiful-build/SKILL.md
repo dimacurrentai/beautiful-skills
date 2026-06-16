@@ -88,10 +88,10 @@ Prefer a tight, CI-runnable definition over a prose demo. Whenever a behavior ca
 5. Run the tests (the primary proof) and the demo; fix anything that fails (no questions).
 6. Report — print the file tree, the commands to run it, the demo/test output you captured, and the full Assumptions list. Tell the user it's complete and how to try it.
 
-## Anti-patterns (do not do these)
+## Anti-patterns
 
-- Asking a second question after intake ("just to confirm…"). Decide and document instead.
-- Delivering a skeleton, TODOs, or "next you'd add…" in place of working code.
+- Do not asking a second question after intake ("just to confirm…"). Decide and document instead.
+- Do not just deliver a skeleton, with TODOs, or "next you'd add…". Provide of working code.
 - Declaring done without running the tests and demo.
 - Proving a testable behavior with only a demo script when it could be a unit/regression test.
 - Forcing the work into a separate `features/` dir when the user just asked to build it in the repo — or ignoring an explicit request to keep it separate.
