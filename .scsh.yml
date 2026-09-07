@@ -37,6 +37,14 @@ skills:
     # available only for callers that explicitly want scsh to launch the wrapper itself.
     profile: code-gorgeous-review-driver
     result: tmp/code-gorgeous-review.md
+  gh-gorgeous-review:
+    harness: codex
+    model: gpt-5.6-terra
+    effort: high
+    timeout: 1200
+    # Keep the agent-facing GitHub wrapper separate from the fleet profile it launches.
+    profile: gh-gorgeous-review-driver
+    result: tmp/gh-gorgeous-review.md
   prepare-gorgeous-pr:
     harness: codex
     model: gpt-5.6-terra
