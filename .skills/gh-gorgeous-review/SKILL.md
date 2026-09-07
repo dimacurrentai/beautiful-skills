@@ -1,13 +1,13 @@
 ---
 name: gh-gorgeous-review
-description: "Review a GitHub PR with the gorgeous fleet, resuming a matching scsh Web UI kickoff when present, then, with explicit approval, publish the findings as one human-voiced GitHub review (COMMENT or APPROVE). Use when the user invokes gh-gorgeous-review, /gh-gorgeous-review, or gives a GitHub pull-request URL to review with the gorgeous fleet."
+description: "Review a GitHub PR with the gorgeous fleet, resuming a matching scsh Web UI kickoff when present, then publish by default the findings as one human-voiced GitHub review (COMMENT or APPROVE). Use when the user invokes gh-gorgeous-review, /gh-gorgeous-review, or gives a GitHub pull-request URL to review with the gorgeous fleet."
 ---
 
 # gh-gorgeous-review — review a GitHub PR with the gorgeous fleet, then publish the findings
 
 The contract:
 
-> **Given a PR link, build a faithful local replica of the PR under `${SCSH_HOME:-$HOME/.scsh}/github-reviews/pr-<number>-<repo>-<owner>/` — full clone (force-refreshed in place if it already exists), PR feature branch checked out, the PR's actual base branch pinned as local `main`, the real PR description recreated as a fake `PR-DESCRIPTION.md` notes commit — snapshot subscription-model quotas with `scsh quota` before and after, run `/code-gorgeous-review` in that replica, report the quota deltas to the operator in chat only, and tell the user the findings as a flat publication-oriented summary — never as clusters, never with an offer to fix or dig deeper. If — and only if — every reviewer in the fleet succeeded, prepare one review: inline comments anchored to the diff wherever possible, plus a single PR-level summary at the end, all phrased as a gracious human reviewer with zero AI/agent/tooling attribution. Ask for explicit approval before publishing it. The review is a COMMENT — unless the grades clear the approval bar (only excellent/good, at least as many excellent as good) and the PR is open and not yet approved by the authenticated user, in which case the very same review is submitted as an APPROVE. Never push code, never request changes, never edit the PR itself.**
+> **Given a PR link, build a faithful local replica of the PR under `${SCSH_HOME:-$HOME/.scsh}/github-reviews/pr-<number>-<repo>-<owner>/` — full clone (force-refreshed in place if it already exists), PR feature branch checked out, the PR's actual base branch pinned as local `main`, the real PR description recreated as a fake `PR-DESCRIPTION.md` notes commit — snapshot subscription-model quotas with `scsh quota` before and after, run `/code-gorgeous-review` in that replica, report the quota deltas to the operator in chat only, and tell the user the findings as a flat publication-oriented summary — never as clusters, never with an offer to fix or dig deeper. If — and only if — every reviewer in the fleet succeeded, prepare one review: inline comments anchored to the diff wherever possible, plus a single PR-level summary at the end, all phrased as a gracious human reviewer with zero AI/agent/tooling attribution. Invoking this skill authorizes publication by default; publish without asking again unless the user explicitly requested a preview or local-only review. The review is a COMMENT — unless the grades clear the approval bar (only excellent/good, at least as many excellent as good) and the PR is open and not yet approved by the authenticated user, in which case the very same review is submitted as an APPROVE. Never push code, never request changes, never edit the PR itself.**
 
 The argument is the PR link, e.g. `https://github.com/<owner>/<repo>/pull/<number>`. If no argument was given, ask for the PR link and stop.
 
@@ -16,7 +16,7 @@ The argument is the PR link, e.g. `https://github.com/<owner>/<repo>/pull/<numbe
 `gh-gorgeous-review` is the operation's name in both places:
 
 - `$gh-gorgeous-review <PR URL>` (or `/gh-gorgeous-review`) starts and owns the complete conversational workflow.
-- scsh's Run page exposes **Start gh-gorgeous-review**. That browser entry prepares the same durable checkout, snapshots the fleet harness quotas, and runs the full machine-wide `code-gorgeous-review` fleet. It writes `tmp/gh-gorgeous-review-browser.json` in the review checkout, updates its `state` from `running` to `reviewed` or `failed`, and stores the before/after snapshots beside it.
+- scsh's Run page exposes **Start gh-gorgeous-review**. That browser entry prepares the same durable checkout, snapshots the fleet harness quotas, and runs the full machine-wide `code-gorgeous-review` fleet. It writes `tmp/gh-gorgeous-review-browser.json` in the review checkout, updates its `state` through `running`, `reviewed`, `publishing`, and `published` (or `failed` / `publication_failed`), and stores the before/after snapshots beside it. Browser kickoff publishes one review automatically after validating the complete fleet and the current PR head/base; publication has its own visible job step.
 
 After resolving the PR metadata and clone path in step 1, inspect that browser receipt before refreshing the checkout or starting quotas. A receipt is resumable only when all of these are true:
 
@@ -24,7 +24,7 @@ After resolving the PR metadata and clone path in step 1, inspect that browser r
 - The recorded session completed successfully and every expected fleet result exists with a successful route and a parseable grade; use the machine-wide manifest to determine the expected routes.
 - The checkout is clean, its current HEAD is the single reconstructed-description notes commit whose parent is `reviewed_head`, and its local `main` resolves to `baseRefOid`, matching the receipt's `base_head`.
 
-When the receipt passes, do not clone, refresh, snapshot again, or rerun the fleet. Use the existing result files and quota snapshots, then continue with the quota delta and flat publication summary in steps 6–8. If its state is `running`, link the browser job as `http://127.0.0.1:7274/job/<session>` and stop without starting a duplicate. A failed, stale, incomplete, or mismatched receipt is not reusable; explain why briefly and follow the ordinary workflow below.
+When the receipt passes, do not clone, refresh, snapshot again, or rerun the fleet. Use the existing result files and quota snapshots, then continue with the quota delta and flat publication summary in steps 6–8. If its state is `running`, link the browser job as `http://127.0.0.1:7274/job/<session>` and stop without starting a duplicate. A `published` receipt is already complete: read `tmp/gh-review-published.json`, link the review, and do not post again. A `publishing` receipt means publication is in progress; link the job and do not duplicate it. A `publication_failed` receipt may reuse the completed fleet after the checks above; reconcile GitHub's existing reviews before retrying, since a lost response may follow a successful POST. A failed, stale, incomplete, or mismatched receipt is not reusable; explain why briefly and follow the ordinary workflow below.
 
 ## 1. Parse the argument and pull PR metadata
 
@@ -163,11 +163,11 @@ for h in <the same harnesses as step 4>; do scsh quota "$h" --json > "tmp/quota-
 
 - Do not offer to fix findings, apply suggestions, or go deeper on any of them — end the report with the publication outcome of step 8 and nothing else. If the user wants fixes, they will ask.
 
-## 8. Ask, then publish the findings — only after a fully successful fleet run
+## 8. Publish the findings by default — only after a fully successful fleet run
 
-**The gate.** Publish only when every reviewer invocation in the fleet **succeeded** — no failed, errored, or skipped rows in the summary table. If even one failed, skip this step entirely, say so in chat, and leave the PR untouched; the user can re-run the skill once the failure is resolved.
+**The gate.** A successful final retry supersedes its earlier failed attempt. Publish only when every reviewer invocation in the fleet **succeeded** — no failed, errored, or skipped rows in the summary table. If even one failed, skip this step entirely, say so in chat, and leave the PR untouched; the user can re-run the skill once the failure is resolved.
 
-**Explicit approval.** After showing the flat decision sheet and the proposed event (`COMMENT` or `APPROVE`), ask the user to approve publication of that exact review. Do not call the GitHub review API unless they explicitly agree. If they decline or do not answer, leave the PR untouched; the completed local report remains available for inspection.
+**Publication is part of the request.** A `$gh-gorgeous-review` invocation or a browser click on **Start gh-gorgeous-review** authorizes posting the resulting review. Show the flat decision sheet and event (`COMMENT` or `APPROVE`), then publish without another confirmation. An explicit preview, draft-only, local-only, or do-not-post instruction opts out; in that case leave GitHub untouched.
 
 **The approval bar.** The single review is normally `event=COMMENT`, but it becomes `event=APPROVE` when ALL of the following hold:
 
@@ -180,6 +180,8 @@ for h in <the same harnesses as step 4>; do scsh quota "$h" --json > "tmp/quota-
 - The authenticated user is not the PR author (GitHub rejects self-approval).
 
 When the bar is met, say so explicitly in the chat report ("grades cleared the approval bar — submitting as APPROVE"). Never `REQUEST_CHANGES` under any circumstances. If the `APPROVE` submission is rejected by the API for any reason, retry once as `event=COMMENT` so the findings still land.
+
+Before posting, recheck the PR head and base against the reviewed revision; stop on a mismatch. Check for an existing review from the authenticated user containing `<!-- review-head:<PR head SHA> -->` and link it instead of posting a duplicate. Append that marker to the review body and save the successful API response to `tmp/gh-review-published.json`. On an ambiguous network failure, inspect GitHub before retrying; never blindly repeat the POST.
 
 **One review, two layers.** Post everything as a single pull-request review — `COMMENT` or, per the bar above, `APPROVE`:
 
